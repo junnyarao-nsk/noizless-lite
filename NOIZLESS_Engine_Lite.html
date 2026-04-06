@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NOIZLESS Engine Lite</title>
+<style>
+:root{
+    --bg:#0a0a0a;
+    --panel:#151515;
+    --line:#333;
+    --text:#ffffff;
+    --muted:#bbbbbb;
+    --accent:#00ffcc;
+}
+*{
+    box-sizing:border-box;
+}
+body{
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    text-align: center;
+    margin: 0;
+    padding: 16px 12px 32px;
+    -webkit-text-size-adjust: 100%;
+}
+.container{
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+}
+h2{
+    margin: 0 0 18px;
+    font-size: 1.6rem;
+    line-height: 1.3;
+}
+.field{
+    margin-bottom: 14px;
+}
+.label{
+    display:block;
+    margin-bottom: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+}
+input[type="number"]{
+    width: 100%;
+    padding: 12px 14px;
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.2;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: #000;
+}
+.result{
+    margin-top: 18px;
+    padding: 14px 12px;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+}
+button{
+    width: 100%;
+    padding: 14px 16px;
+    margin-top: 6px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 16px;
+    color: #000;
+    cursor: pointer;
+}
+.radio-group{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0;
+}
+.radio-group label{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    font-size: 1rem;
+}
+.radio-group input[type="radio"]{
+    transform: scale(1.15);
+}
+.canvas-wrap{
+    margin-top: 18px;
+}
+canvas{
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #111;
+    border: 1px solid #555;
+    border-radius: 10px;
+}
+.note{
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+@media (min-width: 768px){
+    body{
+        padding-top: 24px;
+    }
+    h2{
+        font-size: 1.8rem;
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h2>NOIZLESS Engine Lite</h2>
+
+    <div class="field">
+        <label class="label" for="spl">メーカーSPL</label>
+        <input type="number" id="spl" value="65" inputmode="decimal">
+    </div>
+
+    <div class="field">
+        <div class="label">吹出方向</div>
+        <div class="radio-group">
+            <label><input type="radio" name="type" value="up" checked> 上吹き</label>
+            <label><input type="radio" name="type" value="front"> 前吹き</label>
+        </div>
+    </div>
+
+    <div class="field">
+        <div class="label">指向係数Q</div>
+        <div class="radio-group">
+            <label><input type="radio" name="Q" value="1"> 1</label>
+            <label><input type="radio" name="Q" value="2"> 2</label>
+            <label><input type="radio" name="Q" value="4" checked> 4</label>
+            <label><input type="radio" name="Q" value="8"> 8</label>
+        </div>
+    </div>
+
+    <div class="field">
+        <label class="label" for="zs">音源高さ (m)</label>
+        <input type="number" id="zs" value="2.0" step="0.1" inputmode="decimal">
+    </div>
+
+    <div class="field">
+        <label class="label" for="zr">受音点高さ (m)</label>
+        <input type="number" id="zr" value="1.5" step="0.1" inputmode="decimal">
+    </div>
+
+    <div class="field">
+        <label class="label" for="r">音源→受音点距離 (m)</label>
+        <input type="number" id="r" value="5.0" step="0.1" inputmode="decimal">
+    </div>
+
+    <div class="field">
+        <label class="label" for="rw">音源→壁距離 (m)</label>
+        <input type="number" id="rw" value="2.0" step="0.1" inputmode="decimal">
+    </div>
+
+    <div class="field">
+        <label class="label" for="hw">壁高さ (m)</label>
+        <input type="number" id="hw" value="2.5" step="0.1" inputmode="decimal">
+    </div>
+
+    <button onclick="calc()">計算</button>
+
+    <div class="result" id="result"></div>
+
+    <div class="canvas-wrap">
+        <canvas id="scene" width="420" height="220"></canvas>
+        <div class="note">地面・音源・遮音壁・受音点の位置関係を表示</div>
+    </div>
+</div>
+
+<script>
+function log10(x){
+    return Math.log(x) / Math.log(10);
+}
+
+function drawScene(zs, zr, r, rw, hw, Q){
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const marginX = 40;
+    const groundY = 180;
+    const usableW = canvas.width - marginX * 2;
+
+    const maxX = Math.max(r, rw, 5);
+    const scaleX = usableW / maxX;
+
+    const maxH = Math.max(zs, zr, hw, 3);
+    const scaleY = 120 / maxH;
+
+    function px(x){ return marginX + x * scaleX; }
+    function py(z){ return groundY - z * scaleY; }
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "#777";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(20, groundY);
+    ctx.lineTo(canvas.width - 20, groundY);
+    ctx.stroke();
+
+    ctx.fillStyle = "#bbb";
+    ctx.font = "12px Arial";
+    ctx.fillText("地面", 10, groundY - 5);
+
+    for(let i = 0; i <= Math.ceil(maxX); i++){
+        let x = px(i);
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.beginPath();
+        ctx.moveTo(x, 20);
+        ctx.lineTo(x, groundY);
+        ctx.stroke();
+
+        ctx.fillStyle = "#888";
+        ctx.fillText(i + "m", x - 8, groundY + 15);
+    }
+
+    let angleMap = {
+        1: Math.PI,
+        2: Math.PI / 2,
+        4: Math.PI / 4,
+        8: Math.PI / 8
+    };
+
+    let spread = angleMap[Q] || Math.PI / 4;
+
+    let centerX = px(0);
+    let centerY = py(zs);
+
+    let grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 120);
+    grad.addColorStop(0, "rgba(255,200,0,0.35)");
+    grad.addColorStop(1, "rgba(255,200,0,0.0)");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, 120, -spread, spread);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#00ff99";
+    ctx.beginPath();
+    ctx.arc(px(0), py(zs), 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#cffff0";
+    ctx.fillText("音源", px(0) - 12, py(zs) - 12);
+
+    ctx.fillStyle = "#66aaff";
+    ctx.beginPath();
+    ctx.arc(px(r), py(zr), 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d8ebff";
+    ctx.fillText("受音点", px(r) - 18, py(zr) - 12);
+
+    ctx.fillStyle = "#cccccc";
+    ctx.fillRect(px(rw) - 5, py(hw), 10, groundY - py(hw));
+    ctx.fillStyle = "#dddddd";
+    ctx.fillText("遮音壁", px(rw) - 18, py(hw) - 10);
+
+    ctx.strokeStyle = "rgba(0,255,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(px(0), py(zs));
+    ctx.lineTo(px(r), py(zr));
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255,204,0,0.9)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(px(0), py(zs));
+    ctx.lineTo(px(rw), py(hw));
+    ctx.lineTo(px(r), py(zr));
+    ctx.stroke();
+
+    ctx.fillStyle = "#aaa";
+    ctx.font = "11px Arial";
+    ctx.fillText("直達線", px(r) / 2 - 10, py((zs + zr) / 2) - 8);
+    ctx.fillText("回折経路", px(rw) + 6, py(hw) - 18);
+}
+
+function calc(){
+    let SPL = parseFloat(document.getElementById("spl").value);
+    let type = document.querySelector('input[name="type"]:checked').value;
+    let Q = parseFloat(document.querySelector('input[name="Q"]:checked').value);
+    let zs = parseFloat(document.getElementById("zs").value);
+    let zr = parseFloat(document.getElementById("zr").value);
+    let r = parseFloat(document.getElementById("r").value);
+    let rw = parseFloat(document.getElementById("rw").value);
+    let hw = parseFloat(document.getElementById("hw").value);
+
+    if (isNaN(SPL) || isNaN(Q) || isNaN(zs) || isNaN(zr) || isNaN(r) || isNaN(rw) || isNaN(hw)) {
+        alert("数値を正しく入力してください");
+        return;
+    }
+
+    if (rw >= r) {
+        alert("壁位置が不正です");
+        return;
+    }
+
+    let freqs = [63,125,250,500,1000,2000,4000,8000];
+
+    let corr_up = [12,9,6,2,-2,-7,-12,-17];
+    let corr_front = [8,5,6,-2,-6,-11,-16,-21];
+
+    let corr = (type == "up") ? corr_up : corr_front;
+
+    let sum_no = 0;
+    let sum_wall = 0;
+
+    let r_direct = Math.sqrt(r * r + (zs - zr) * (zs - zr));
+    let r1 = Math.sqrt(rw * rw + (zs - hw) * (zs - hw));
+    let r2 = Math.sqrt((r - rw) * (r - rw) + (hw - zr) * (hw - zr));
+
+    let delta = r1 + r2 - r_direct;
+
+    for(let i = 0; i < freqs.length; i++){
+        let f = freqs[i];
+        let Lw = SPL + corr[i];
+
+        let Lp_no = Lw + 10 * log10(Q / (4 * Math.PI * r_direct * r_direct));
+
+        let lambda = 340 / f;
+        let N = delta / lambda;
+
+        let diff = 10 * log10(3 + 20 * N);
+        if (diff > 25) diff = 25;
+        if (diff < 0 || !isFinite(diff)) diff = 0;
+
+        let Lp_wall = Lp_no - diff;
+
+        let A = [-26,-16,-9,-3,0,1,1,-1][i];
+
+        sum_no += Math.pow(10, (Lp_no + A) / 10);
+        sum_wall += Math.pow(10, (Lp_wall + A) / 10);
+    }
+
+    let LA_no = Math.round(10 * log10(sum_no));
+    let LA_wall = Math.round(10 * log10(sum_wall));
+    let diffA = Math.round(LA_no - LA_wall);
+
+    document.getElementById("result").innerHTML =
+    `壁なし：${LA_no} dB(A)<br>
+壁あり：${LA_wall} dB(A)<br>
+低減量：${diffA} dB`;
+
+    drawScene(zs, zr, r, rw, hw, Q);
+}
+
+calc();
+</script>
+
+</body>
+</html>
