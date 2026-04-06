@@ -115,13 +115,8 @@ canvas{
     font-size: 0.9rem;
     line-height: 1.5;
 }
-@media (min-width: 768px){
-    body{
-        padding-top: 24px;
-    }
-    h2{
-        font-size: 1.8rem;
-    }
+.hidden{
+    display:none;
 }
 </style>
 </head>
@@ -154,6 +149,14 @@ canvas{
     </div>
 
     <div class="field">
+        <div class="label">遮音壁</div>
+        <div class="radio-group">
+            <label><input type="radio" name="barrier" value="off" checked onchange="toggleBarrier()"> 壁なし</label>
+            <label><input type="radio" name="barrier" value="on" onchange="toggleBarrier()"> 壁あり</label>
+        </div>
+    </div>
+
+    <div class="field">
         <label class="label" for="zs">音源高さ (m)</label>
         <input type="number" id="zs" value="2.0" step="0.1" inputmode="decimal">
     </div>
@@ -168,14 +171,16 @@ canvas{
         <input type="number" id="r" value="5.0" step="0.1" inputmode="decimal">
     </div>
 
-    <div class="field">
-        <label class="label" for="rw">音源→壁距離 (m)</label>
-        <input type="number" id="rw" value="2.0" step="0.1" inputmode="decimal">
-    </div>
+    <div id="barrierFields" class="hidden">
+        <div class="field">
+            <label class="label" for="rw">音源→壁距離 (m)</label>
+            <input type="number" id="rw" value="2.0" step="0.1" inputmode="decimal">
+        </div>
 
-    <div class="field">
-        <label class="label" for="hw">壁高さ (m)</label>
-        <input type="number" id="hw" value="2.5" step="0.1" inputmode="decimal">
+        <div class="field">
+            <label class="label" for="hw">壁高さ (m)</label>
+            <input type="number" id="hw" value="2.5" step="0.1" inputmode="decimal">
+        </div>
     </div>
 
     <button onclick="calc()">計算</button>
@@ -193,7 +198,14 @@ function log10(x){
     return Math.log(x) / Math.log(10);
 }
 
-function drawScene(zs, zr, r, rw, hw, Q){
+function toggleBarrier(){
+    const barrierMode = document.querySelector('input[name="barrier"]:checked').value;
+    const barrierFields = document.getElementById("barrierFields");
+    barrierFields.classList.toggle("hidden", barrierMode !== "on");
+    calc();
+}
+
+function drawScene(zs, zr, r, rw, hw, Q, barrierOn){
     const canvas = document.getElementById("scene");
     const ctx = canvas.getContext("2d");
 
@@ -203,10 +215,13 @@ function drawScene(zs, zr, r, rw, hw, Q){
     const groundY = 180;
     const usableW = canvas.width - marginX * 2;
 
-    const maxX = Math.max(r, rw, 5);
+    const refRw = barrierOn ? rw : 0;
+    const refHw = barrierOn ? hw : 0;
+
+    const maxX = Math.max(r, refRw, 5);
     const scaleX = usableW / maxX;
 
-    const maxH = Math.max(zs, zr, hw, 3);
+    const maxH = Math.max(zs, zr, refHw, 3);
     const scaleY = 120 / maxH;
 
     function px(x){ return marginX + x * scaleX; }
@@ -275,10 +290,12 @@ function drawScene(zs, zr, r, rw, hw, Q){
     ctx.fillStyle = "#d8ebff";
     ctx.fillText("受音点", px(r) - 18, py(zr) - 12);
 
-    ctx.fillStyle = "#cccccc";
-    ctx.fillRect(px(rw) - 5, py(hw), 10, groundY - py(hw));
-    ctx.fillStyle = "#dddddd";
-    ctx.fillText("遮音壁", px(rw) - 18, py(hw) - 10);
+    if(barrierOn){
+        ctx.fillStyle = "#cccccc";
+        ctx.fillRect(px(rw) - 5, py(hw), 10, groundY - py(hw));
+        ctx.fillStyle = "#dddddd";
+        ctx.fillText("遮音壁", px(rw) - 18, py(hw) - 10);
+    }
 
     ctx.strokeStyle = "rgba(0,255,255,0.7)";
     ctx.lineWidth = 2;
@@ -288,37 +305,51 @@ function drawScene(zs, zr, r, rw, hw, Q){
     ctx.lineTo(px(r), py(zr));
     ctx.stroke();
 
-    ctx.strokeStyle = "rgba(255,204,0,0.9)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(px(0), py(zs));
-    ctx.lineTo(px(rw), py(hw));
-    ctx.lineTo(px(r), py(zr));
-    ctx.stroke();
+    if(barrierOn){
+        ctx.strokeStyle = "rgba(255,204,0,0.9)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(px(0), py(zs));
+        ctx.lineTo(px(rw), py(hw));
+        ctx.lineTo(px(r), py(zr));
+        ctx.stroke();
 
-    ctx.fillStyle = "#aaa";
-    ctx.font = "11px Arial";
-    ctx.fillText("直達線", px(r) / 2 - 10, py((zs + zr) / 2) - 8);
-    ctx.fillText("回折経路", px(rw) + 6, py(hw) - 18);
+        ctx.fillStyle = "#aaa";
+        ctx.font = "11px Arial";
+        ctx.fillText("直達線", px(r) / 2 - 10, py((zs + zr) / 2) - 8);
+        ctx.fillText("回折経路", px(rw) + 6, py(hw) - 18);
+    } else {
+        ctx.fillStyle = "#aaa";
+        ctx.font = "11px Arial";
+        ctx.fillText("直達線", px(r) / 2 - 10, py((zs + zr) / 2) - 8);
+    }
 }
 
 function calc(){
     let SPL = parseFloat(document.getElementById("spl").value);
     let type = document.querySelector('input[name="type"]:checked').value;
     let Q = parseFloat(document.querySelector('input[name="Q"]:checked').value);
+    let barrierMode = document.querySelector('input[name="barrier"]:checked').value;
+    let barrierOn = barrierMode === "on";
+
     let zs = parseFloat(document.getElementById("zs").value);
     let zr = parseFloat(document.getElementById("zr").value);
     let r = parseFloat(document.getElementById("r").value);
     let rw = parseFloat(document.getElementById("rw").value);
     let hw = parseFloat(document.getElementById("hw").value);
 
-    if (isNaN(SPL) || isNaN(Q) || isNaN(zs) || isNaN(zr) || isNaN(r) || isNaN(rw) || isNaN(hw)) {
+    if (isNaN(SPL) || isNaN(Q) || isNaN(zs) || isNaN(zr) || isNaN(r)) {
         alert("数値を正しく入力してください");
         return;
     }
 
-    if (rw >= r) {
+    if (barrierOn && (isNaN(rw) || isNaN(hw))) {
+        alert("遮音壁の数値を正しく入力してください");
+        return;
+    }
+
+    if (barrierOn && rw >= r) {
         alert("壁位置が不正です");
         return;
     }
@@ -327,17 +358,24 @@ function calc(){
 
     let corr_up = [12,9,6,2,-2,-7,-12,-17];
     let corr_front = [8,5,6,-2,-6,-11,-16,-21];
-
     let corr = (type == "up") ? corr_up : corr_front;
 
     let sum_no = 0;
     let sum_wall = 0;
 
     let r_direct = Math.sqrt(r * r + (zs - zr) * (zs - zr));
-    let r1 = Math.sqrt(rw * rw + (zs - hw) * (zs - hw));
-    let r2 = Math.sqrt((r - rw) * (r - rw) + (hw - zr) * (hw - zr));
 
-    let delta = r1 + r2 - r_direct;
+    let barrierBlocks = false;
+    let delta = 0;
+
+    if (barrierOn) {
+        let r1 = Math.sqrt(rw * rw + (zs - hw) * (zs - hw));
+        let r2 = Math.sqrt((r - rw) * (r - rw) + (hw - zr) * (hw - zr));
+        delta = r1 + r2 - r_direct;
+
+        let z_line = zs + (zr - zs) * (rw / r);
+        barrierBlocks = hw > z_line;
+    }
 
     for(let i = 0; i < freqs.length; i++){
         let f = freqs[i];
@@ -345,12 +383,15 @@ function calc(){
 
         let Lp_no = Lw + 10 * log10(Q / (4 * Math.PI * r_direct * r_direct));
 
-        let lambda = 340 / f;
-        let N = delta / lambda;
+        let diff = 0;
 
-        let diff = 10 * log10(3 + 20 * N);
-        if (diff > 25) diff = 25;
-        if (diff < 0 || !isFinite(diff)) diff = 0;
+        if (barrierOn && hw > 0 && barrierBlocks) {
+            let lambda = 340 / f;
+            let N = delta / lambda;
+            diff = 10 * log10(3 + 20 * N);
+            if (diff > 25) diff = 25;
+            if (diff < 0 || !isFinite(diff)) diff = 0;
+        }
 
         let Lp_wall = Lp_no - diff;
 
@@ -364,15 +405,20 @@ function calc(){
     let LA_wall = Math.round(10 * log10(sum_wall));
     let diffA = Math.round(LA_no - LA_wall);
 
-    document.getElementById("result").innerHTML =
-    `壁なし：${LA_no} dB(A)<br>
+    if (!barrierOn) {
+        document.getElementById("result").innerHTML =
+        `騒音レベル：${LA_no} dB(A)`;
+    } else {
+        document.getElementById("result").innerHTML =
+        `壁なし：${LA_no} dB(A)<br>
 壁あり：${LA_wall} dB(A)<br>
 低減量：${diffA} dB`;
+    }
 
-    drawScene(zs, zr, r, rw, hw, Q);
+    drawScene(zs, zr, r, rw, hw, Q, barrierOn);
 }
 
-calc();
+toggleBarrier();
 </script>
 
 </body>
