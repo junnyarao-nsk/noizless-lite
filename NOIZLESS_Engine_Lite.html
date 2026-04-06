@@ -68,7 +68,7 @@ button{
     width: 100%;
     padding: 14px 16px;
     margin-top: 6px;
-    background: var(--accent);
+    background: #ffd900;
     border: none;
     border-radius: 10px;
     font-weight: bold;
@@ -412,7 +412,7 @@ function calc(){
         document.getElementById("result").innerHTML =
         `壁なし：${LA_no} dB(A)<br>
 壁あり：${LA_wall} dB(A)<br>
-低減量：${diffA} dB`;
+回折減衰量：${diffA} dB`;
     }
 
     drawScene(zs, zr, r, rw, hw, Q, barrierOn);
